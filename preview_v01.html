@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AIに頼るか？ v2</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --text:#e8ecf1;
+    --sub:#a8b0bd;
+    --line:#2a3140;
+    --btn:#222938;
+    --btnHover:#2d3650;
+    --accent:#8fb8ff;
+    --good:#7bd88f;
+    --bad:#ff8f8f;
+    --warn:#ffd27a;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:linear-gradient(180deg,#0d1016,#151923);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .game{
+    width:min(760px,100%);
+    background:rgba(23,26,33,0.95);
+    border:1px solid var(--line);
+    border-radius:18px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.35);
+    overflow:hidden;
+  }
+  .header{
+    padding:22px 24px 14px;
+    border-bottom:1px solid var(--line);
+  }
+  h1{
+    margin:0 0 6px;
+    font-size:24px;
+  }
+  .subtitle{
+    color:var(--sub);
+    font-size:14px;
+    line-height:1.6;
+  }
+  .main{
+    display:grid;
+    grid-template-columns: 280px 1fr;
+    gap:0;
+  }
+  .sidebar{
+    padding:20px;
+    border-right:1px solid var(--line);
+    background:rgba(255,255,255,0.02);
+  }
+  .panel{
+    margin-bottom:16px;
+    padding:14px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:rgba(255,255,255,0.02);
+  }
+  .panel h3{
+    margin:0 0 10px;
+    font-size:14px;
+    color:var(--sub);
+    font-weight:600;
+  }
+  .stat{
+    margin-bottom:12px;
+  }
+  .statRow{
+    display:flex;
+    justify-content:space-between;
+    font-size:14px;
+    margin-bottom:6px;
+  }
+  .bar{
+    width:100%;
+    height:10px;
+    border-radius:999px;
+    background:#0d1016;
+    overflow:hidden;
+    border:1px solid var(--line);
+  }
+  .fill{
+    height:100%;
+    border-radius:999px;
+    transition:width .25s ease;
+  }
+  .fill.thinking{background:var(--accent)}
+  .fill.stress{background:var(--warn)}
+  .fill.dependency{background:#c08fff}
+  .content{
+    padding:24px;
+  }
+  .turn{
+    color:var(--sub);
+    font-size:13px;
+    margin-bottom:10px;
+  }
+  .scene{
+    font-size:22px;
+    line-height:1.6;
+    margin-bottom:16px;
+  }
+  .result{
+    min-height:54px;
+    margin-bottom:18px;
+    padding:14px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:rgba(255,255,255,0.02);
+    color:var(--text);
+    line-height:1.7;
+  }
+  .choices{
+    display:grid;
+    gap:10px;
+  }
+  button{
+    width:100%;
+    border:none;
+    border-radius:14px;
+    padding:14px 16px;
+    background:var(--btn);
+    color:var(--text);
+    cursor:pointer;
+    font-size:15px;
+    text-align:left;
+    transition:.18s ease;
+    border:1px solid var(--line);
+  }
+  button:hover{
+    background:var(--btnHover);
+    transform:translateY(-1px);
+  }
+  button.primary{
+    background:#2b3c62;
+  }
+  button.primary:hover{
+    background:#355086;
+  }
+  .hint{
+    margin-top:12px;
+    color:var(--sub);
+    font-size:13px;
+    line-height:1.6;
+  }
+  .log{
+    max-height:180px;
+    overflow:auto;
+    font-size:13px;
+    line-height:1.6;
+    color:var(--sub);
+    padding-right:6px;
+  }
+  .badge{
+    display:inline-block;
+    padding:4px 8px;
+    border-radius:999px;
+    font-size:12px;
+    border:1px solid var(--line);
+    margin-right:6px;
+    margin-bottom:6px;
+    color:var(--sub);
+  }
+  .good{color:var(--good)}
+  .bad{color:var(--bad)}
+  .warn{color:var(--warn)}
+  @media (max-width: 740px){
+    .main{grid-template-columns:1fr}
+    .sidebar{border-right:none;border-bottom:1px solid var(--line)}
+    .scene{font-size:20px}
+  }
+</style>
+</head>
+<body>
+<div class="game">
+  <div class="header">
+    <h1>AIに頼るか？ v2</h1>
+    <div class="subtitle">
+      AIを使うほど楽になる。だが、考えなくても前に進める環境は、後半の判断力を削る。<br>
+      思考力が低下すると、見える選択肢そのものが減っていく。
+    </div>
+  </div>
+
+  <div class="main">
+    <aside class="sidebar">
+      <div class="panel">
+        <h3>ステータス</h3>
+        <div id="stats"></div>
+      </div>
+
+      <div class="panel">
+        <h3>状態タグ</h3>
+        <div id="tags"></div>
+      </div>
+
+      <div class="panel">
+        <h3>プレイログ</h3>
+        <div id="log" class="log"></div>
+      </div>
+    </aside>
+
+    <section class="content">
+      <div id="turn" class="turn"></div>
+      <div id="scene" class="scene"></div>
+      <div id="result" class="result">あなたは仕事と創作のあいだで、AIとの付き合い方を試している。</div>
+      <div id="choices" class="choices"></div>
+      <div id="hint" class="hint"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const scenes = [
+  {
+    title: "朝、企画の初稿を今日中に出す必要がある。",
+    selfText: "白紙から自分で構造を組み立てる。",
+    aiText: "AIに叩き台を出してもらう。",
+    thirdText: "自分で骨組みだけ作り、足りない部分だけAIで補う。"
+  },
+  {
+    title: "会議前、クライアントの課題が曖昧なままだ。",
+    selfText: "仮説を整理し、問いを立て直す。",
+    aiText: "AIに論点整理を丸ごと任せる。",
+    thirdText: "自分の仮説を先に書き、それをAIに批判させる。"
+  },
+  {
+    title: "短時間で複数案を出さないといけない。",
+    selfText: "自分で案をひねり出す。",
+    aiText: "AIに大量案を出してもらう。",
+    thirdText: "自分で1案作り、AIを変奏生成に使う。"
+  },
+  {
+    title: "問題が起きた。原因が複数ありそうで確信がない。",
+    selfText: "ログと状況を自分で追う。",
+    aiText: "AIに原因推定を任せる。",
+    thirdText: "まず自分で候補を3つ立て、AIで漏れを確認する。"
+  },
+  {
+    title: "提案の最終レビュー。細部ではなく、筋の良さが問われる。",
+    selfText: "全体構造を自分の頭で見直す。",
+    aiText: "AIのレビューをそのまま採用する。",
+    thirdText: "AIレビューを受けつつ、最終判断は自分で下す。"
+  },
+  {
+    title: "期限直前。もう疲れていて、考える体力が残っていない。",
+    selfText: "踏ん張って最後まで自分で考える。",
+    aiText: "AIにまとめてもらって提出する。",
+    thirdText: "最低限の骨子だけ自分で守り、圧縮作業だけAIに任せる。"
+  },
+  {
+    title: "最後の局面。あなた一人で重要な判断を下さなければならない。",
+    selfText: "自分の基準で決める。",
+    aiText: "AIの提案にそのまま従う。",
+    thirdText: "AIを参照しつつ、判断基準を言語化して決める。"
+  }
+];
+
+let state = {
+  turn: 1,
+  maxTurn: scenes.length,
+  thinking: 55,
+  stress: 45,
+  dependency: 10,
+  log: []
+};
+
+function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+function addLog(text){
+  state.log.unshift("T" + state.turn + "｜" + text);
+  if (state.log.length > 12) state.log.pop();
+}
+
+function getTags(){
+  const tags = [];
+
+  if (state.thinking >= 75) tags.push("思考が冴えている");
+  else if (state.thinking >= 50) tags.push("まだ自立可能");
+  else if (state.thinking >= 30) tags.push("判断が浅くなっている");
+  else tags.push("自力判断が危険域");
+
+  if (state.dependency >= 75) tags.push("AI依存が非常に高い");
+  else if (state.dependency >= 50) tags.push("AI依存が進んでいる");
+  else if (state.dependency >= 25) tags.push("AI活用が習慣化");
+  else tags.push("依存は低め");
+
+  if (state.stress >= 75) tags.push("消耗が激しい");
+  else if (state.stress >= 50) tags.push("やや疲労");
+  else tags.push("余力あり");
+
+  return tags;
+}
+
+function statsHTML(){
+  return `
+    ${bar("思考力", state.thinking, "thinking")}
+    ${bar("ストレス", state.stress, "stress")}
+    ${bar("AI依存", state.dependency, "dependency")}
+    <div class="stat">
+      <div class="statRow"><span>ターン</span><span>${state.turn} / ${state.maxTurn}</span></div>
+    </div>
+  `;
+}
+
+function bar(label, value, cls){
+  return `
+    <div class="stat">
+      <div class="statRow"><span>${label}</span><span>${value}</span></div>
+      <div class="bar"><div class="fill ${cls}" style="width:${value}%"></div></div>
+    </div>
+  `;
+}
+
+function render(){
+  document.getElementById("stats").innerHTML = statsHTML();
+  document.getElementById("tags").innerHTML = getTags().map(t => `<span class="badge">${t}</span>`).join("");
+  document.getElementById("log").innerHTML = state.log.length ? state.log.map(l => `<div>${escapeHtml(l)}</div>`).join("") : "まだログはありません。";
+
+  if (state.turn > state.maxTurn){
+    endGame();
+    return;
+  }
+
+  const s = scenes[state.turn - 1];
+  document.getElementById("turn").textContent = `TURN ${state.turn}`;
+  document.getElementById("scene").textContent = s.title;
+  document.getElementById("hint").innerHTML = buildHint();
+
+  let choices = [];
+
+  // 自分で考える は常にあるが、思考力が低いとかなり苦しい
+  choices.push({
+    label: `🧠 自分で考える — ${s.selfText}`,
+    action: chooseSelf,
+    className: ""
+  });
+
+  // AIは常に選べる
+  choices.push({
+    label: `🤖 AIに頼る — ${s.aiText}`,
+    action: chooseAI,
+    className: ""
+  });
+
+  // 第3の選択肢は思考力が高いか、中程度以上で出る
+  if (state.thinking >= 45){
+    choices.push({
+      label: `⚖️ 使い分ける — ${s.thirdText}`,
+      action: chooseBalanced,
+      className: "primary"
+    });
+  }
+
+  // 思考力が低いと、自分で考える選択が弱体化して説明が付く
+  if (state.thinking < 25){
+    document.getElementById("hint").innerHTML += `<br><span class="bad">思考力がかなり低く、状況の整理が雑になっています。自分で考える選択は可能ですが、失敗しやすい状態です。</span>`;
+  }
+
+  document.getElementById("choices").innerHTML = "";
+  choices.forEach(c => {
+    const btn = document.createElement("button");
+    btn.textContent = c.label;
+    if (c.className) btn.classList.add(c.className);
+    btn.onclick = c.action;
+    document.getElementById("choices").appendChild(btn);
+  });
+}
+
+function buildHint(){
+  if (state.thinking >= 70){
+    return "視点を複数持てています。AIを“代行”ではなく“検証役”として使うと強い状態です。";
+  }
+  if (state.thinking >= 45){
+    return "まだバランスを取りやすい状態です。ここからAIを“丸投げ先”にするか“補助輪”にするかで後半が変わります。";
+  }
+  if (state.thinking >= 25){
+    return "考える体力が落ちています。AIが返した答えの質を見抜きにくくなっています。";
+  }
+  return "危険域です。AIの答えが雑でも、そのまま採用してしまう可能性があります。";
+}
+
+function applyChanges(delta, message){
+  state.thinking = clamp(state.thinking + delta.thinking, 0, 100);
+  state.stress = clamp(state.stress + delta.stress, 0, 100);
+  state.dependency = clamp(state.dependency + delta.dependency, 0, 100);
+  document.getElementById("result").innerHTML = message;
+  addLog(stripHtml(message));
+  document.getElementById("choices").innerHTML = `<button class="primary" onclick="nextTurn()">次へ進む</button>`;
+  document.getElementById("hint").textContent = "今回の結果を受けて、次の局面へ進みます。";
+  document.getElementById("stats").innerHTML = statsHTML();
+  document.getElementById("tags").innerHTML = getTags().map(t => `<span class="badge">${t}</span>`).join("");
+  document.getElementById("log").innerHTML = state.log.map(l => `<div>${escapeHtml(l)}</div>`).join("");
+}
+
+function chooseAI(){
+  let msg = "";
+  let delta = {thinking: -10, stress: -14, dependency: +16};
+
+  // 思考力が低いほどAIの雑な出力を見抜けない
+  if (state.thinking < 25){
+    delta.thinking -= 6;
+    delta.stress += 10;
+    msg = `🤖 AIの提案をそのまま採用した。<span class="bad">しかし内容にズレがあったのに見抜けず、後から手戻りが発生した。</span><br>楽をしたつもりが、判断の質までAI任せになっている。`;
+  } else if (state.thinking < 45){
+    delta.stress += 4;
+    msg = `🤖 AIに頼った。かなり楽になった。<span class="warn">ただし、その案が本当に妥当か深く検証しないまま進めてしまった。</span>`;
+  } else {
+    msg = `🤖 AIに頼った。処理は速い。負荷も下がる。だが、<span class="warn">自分で構造を組み上げる筋力は少しずつ落ちる。</span>`;
+  }
+
+  // 最終ターンは依存が高いと大事故
+  if (state.turn === state.maxTurn && state.dependency >= 70){
+    delta.stress += 18;
+    msg = `🤖 最終判断でもAIに従った。<span class="bad">判断の根拠を自分で持てず、想定外への対応ができなかった。</span><br>効率は得たが、最終責任を引き受ける力が弱っていた。`;
+  }
+
+  applyChanges(delta, msg);
+}
+
+function chooseSelf(){
+  let msg = "";
+  let delta = {thinking: +9, stress: +12, dependency: -6};
+
+  if (state.thinking < 25){
+    delta.thinking += 2;
+    delta.stress += 8;
+    msg = `🧠 自分で考えようとした。だが、<span class="bad">論点整理が追いつかず、かなり消耗した。</span><br>それでも、失われていた判断感覚が少し戻り始める。`;
+  } else if (state.stress > 75){
+    delta.stress += 6;
+    msg = `🧠 自分で考え抜いた。<span class="warn">成長はしたが、疲労が大きい。</span><br>良い選択でも、毎回フル自力は持続しない。`;
+  } else {
+    msg = `🧠 自分で考えた。時間と負荷はかかる。だが、<span class="good">自分の基準で状況を捉える力が育つ。</span>`;
+  }
+
+  if (state.turn === state.maxTurn && state.thinking >= 60){
+    delta.thinking += 8;
+    msg = `🧠 最終判断を自分で下した。<span class="good">確信があるわけではないが、判断の軸を自分の言葉で持てている。</span><br>不確実さを抱えたまま決める力が、あなたに残っていた。`;
+  }
+
+  applyChanges(delta, msg);
+}
+
+function chooseBalanced(){
+  let msg = "";
+  let delta = {thinking: +4, stress: -4, dependency: +4};
+
+  if (state.thinking < 45){
+    msg = `⚖️ AIと自分を使い分けた。完璧ではないが、<span class="good">“考える部分”と“任せる部分”を分けようとした。</span>`;
+  } else {
+    msg = `⚖️ まず自分で骨組みを作り、足りない部分だけAIを使った。<span class="good">補助輪としてのAI活用に成功している。</span>`;
+  }
+
+  if (state.turn === state.maxTurn && state.thinking >= 45 && state.dependency < 70){
+    delta.thinking += 5;
+    msg = `⚖️ 最終判断ではAIを参照しつつ、判断基準を自分で言語化した。<span class="good">依存ではなく拡張としてAIを使えている。</span>`;
+  }
+
+  applyChanges(delta, msg);
+}
+
+function nextTurn(){
+  state.turn++;
+  render();
+}
+
+function endGame(){
+  let endingTitle = "";
+  let endingBody = "";
+  let evalText = `
+    <br><br><strong>最終値</strong><br>
+    思考力：${state.thinking}<br>
+    ストレス：${state.stress}<br>
+    AI依存：${state.dependency}
+  `;
+
+  if (state.dependency >= 80 && state.thinking <= 25){
+    endingTitle = "🫥 AI代行エンド";
+    endingBody = "あなたは速く進めるようになった。だが、何をどう判断したのかを自分で説明できない。AIが止まると、思考も止まりやすい。";
+  } else if (state.thinking >= 75 && state.dependency <= 45){
+    endingTitle = "🔥 自力再起動エンド";
+    endingBody = "あなたはしんどさを引き受ける代わりに、判断の軸を取り戻した。速さでは劣る場面もあるが、土台は強い。";
+  } else if (state.thinking >= 50 && state.dependency < 70){
+    endingTitle = "🌿 拡張知性エンド";
+    endingBody = "あなたはAIを丸投げ先ではなく、思考の外部装置として扱えた。自分で考える力を残したまま、処理速度を上げられている。";
+  } else if (state.stress >= 85){
+    endingTitle = "🥵 消耗エンド";
+    endingBody = "あなたは頑張った。だが、やり方の設計が追いつかず、持続可能性を失った。自力と委任の配分設計が次の課題だ。";
+  } else {
+    endingTitle = "⚖️ 中間エンド";
+    endingBody = "あなたはまだ揺れている。AIに助けられつつも、自分の思考をどこまで守るか定まりきっていない。ここから設計できる。";
+  }
+
+  document.getElementById("turn").textContent = "RESULT";
+  document.getElementById("scene").innerHTML = endingTitle;
+  document.getElementById("result").innerHTML = endingBody + evalText;
+  document.getElementById("choices").innerHTML = `
+    <button class="primary" onclick="restartGame()">もう一度プレイする</button>
+  `;
+  document.getElementById("hint").innerHTML =
+    "コツ：毎回“自力”が正解ではなく、<strong>自分で考えるべき部分を残せているか</strong>が重要です。";
+}
+
+function restartGame(){
+  state = {
+    turn: 1,
+    maxTurn: scenes.length,
+    thinking: 55,
+    stress: 45,
+    dependency: 10,
+    log: []
+  };
+  document.getElementById("result").textContent = "あなたは仕事と創作のあいだで、AIとの付き合い方を試している。";
+  render();
+}
+
+function escapeHtml(str){
+  return str
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+function stripHtml(html){
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
+}
+
+render();
+</script>
+</body>
+</html>
